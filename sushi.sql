@@ -269,3 +269,71 @@ BEGIN
     AND salary < 50000;
    DBMS_OUTPUT.PUT_LINE('The number of chefs that have a smaller salary than 50000 is ' || v_count);
 END;
+
+--B. Alternative and repetitive structures (IF, CASE, FOR, LOOP, WHILE).
+
+-- display the number of menu items with and without alergens 
+
+DECLARE
+    v_no_al NUMBER := 0;
+    v_al NUMBER := 0;
+BEGIN
+    FOR item IN (SELECT ITEM_ALLERGENS FROM PROJECT_MENU_ITEMS) LOOP
+        IF item.ITEM_ALLERGENS = '-' THEN
+            v_no_al := v_no_al + 1;
+        ELSE
+            v_al := v_al + 1;
+        END IF;
+    END LOOP;
+    
+    DBMS_OUTPUT.PUT_LINE('Items with allergens: ' || v_al);
+    DBMS_OUTPUT.PUT_LINE('Items with no allergens: ' || v_no_al);
+END;
+
+-- create an index by table data collection to display all the menu items that have the item type 'SUSHI ROLLS'
+
+DECLARE
+  TYPE T_SUSHI_ROLLS IS TABLE OF VARCHAR2(100) INDEX BY PLS_INTEGER;
+  V T_SUSHI_ROLLS;
+BEGIN
+  SELECT ITEM_NAME BULK COLLECT INTO V FROM PROJECT_MENU_ITEMS
+        WHERE ITEM_TYPE = 'SUSHI ROLLS';
+  DBMS_OUTPUT.PUT_LINE(V.COUNT);
+  FOR I IN V.FIRST..V.LAST LOOP
+   IF V.EXISTS(I) THEN
+     DBMS_OUTPUT.PUT_LINE(I||'.'||V(I));
+   END IF;  
+  END LOOP;
+END;
+/
+
+-- create a nested table in otder to store and display the chef specialties
+
+DECLARE
+  TYPE specialty_table IS TABLE OF VARCHAR2(50);
+  v_specialties specialty_table := specialty_table();
+BEGIN
+  v_specialties.EXTEND;
+  v_specialties(1) := 'Chefs special Temaki rolls';
+  v_specialties.EXTEND;
+  v_specialties(2) := 'Chef Jemima special vegan plateau';
+  v_specialties.EXTEND;
+  v_specialties(3) := 'Ramen Surprise';
+
+  FOR i IN 1..v_specialties.COUNT LOOP
+    DBMS_OUTPUT.PUT_LINE(i||'.'||v_specialties(i));
+  END LOOP;
+END;
+
+--create a varray in order to stoare and display all the available locations for sitting
+
+DECLARE
+  TYPE location_varray IS VARRAY(5) OF VARCHAR2(50);
+  v_locations location_varray := location_varray('Next to the entrance', 'On the terrace', 'Next to the drinks bar','In the centre of the restaurant','Next to the dessert bar');
+  v_table_no NUMBER;
+BEGIN
+  FOR i IN 1..v_locations.COUNT LOOP
+    DBMS_OUTPUT.PUT_LINE('Table no '||i||' is located '||LOWER(v_locations(i)));
+  END LOOP;
+END;
+
