@@ -337,3 +337,203 @@ BEGIN
   END LOOP;
 END;
 
+--create a procedure to delete a customer
+
+CREATE OR REPLACE PROCEDURE delete_customer(pro_id NUMBER) IS 
+BEGIN
+  DELETE FROM PROJECT_CUSTOMERS 
+  WHERE customer_id = pro_id;
+END;
+
+BEGIN
+  delete_customer(31413);
+END;
+
+--create a trigger that verifies if a reservation date is in one of the working dates (the restaurant is closed on mondays)
+
+CREATE OR REPLACE TRIGGER check_reservation_date
+BEFORE INSERT OR UPDATE ON project_customers
+FOR EACH ROW
+DECLARE
+    v_working_date NUMBER;
+BEGIN
+    v_working_date := TO_NUMBER(TO_CHAR(:NEW.reservation_date, 'DD'));
+    IF v_working_date BETWEEN 3 AND 10 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Reservations cannot be made from the 3rd to the 10th of each month. Please choose another date.');
+    END IF;
+END;
+
+INSERT INTO project_customers (customer_id, customer_name, reservation_date) VALUES (68903, 'Veritas', TO_DATE('2024-05-05', 'YYYY-MM-DD'));
+INSERT INTO project_customers (customer_id, customer_name, reservation_date) VALUES (68903, 'Jordan', TO_DATE('2024-25-05', 'YYYY-DD-MM'));
+
+--use an explicit cursor in order to display the name and expiration date of the ingredients that expired on before 1st of February 2024
+
+DECLARE
+  CURSOR c_expired_ingredients IS
+    SELECT ingredient_name, expiration_date
+    FROM project_ingredients
+    WHERE expiration_date < TO_DATE('2024-02-01', 'YYYY-MM-DD');
+
+  v_ingredient_name project_ingredients.ingredient_name%TYPE;
+  v_expiration_date project_ingredients.expiration_date%TYPE;
+BEGIN
+
+  OPEN c_expired_ingredients;
+  
+  LOOP
+    FETCH c_expired_ingredients INTO v_ingredient_name, v_expiration_date;
+    EXIT WHEN c_expired_ingredients%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE('Ingredient ' || v_ingredient_name || ' expired on : ' || TO_CHAR(v_expiration_date, 'YYYY-MM-DD'));
+  END LOOP;
+  CLOSE c_expired_ingredients;
+END;
+
+--display the menu_items that are more expensive than a given value (50)
+
+DECLARE
+  CURSOR c_expensive (p_val NUMBER) IS
+   SELECT item_name, item_price
+   FROM project_menu_items
+   WHERE item_price > p_val;
+  v_menu_item_name project_menu_items.item_name%TYPE;
+  v_price project_menu_items.item_price%TYPE;
+  n_val NUMBER(3):= 50;
+ BEGIN 
+   DBMS_OUTPUT.PUT_LINE('The products that have a price higer than '|| n_val ||' lei:');
+   OPEN c_expensive (n_val);
+  LOOP
+   FETCH c_expensive into v_menu_item_name, v_price;
+   EXIT WHEN c_expensive%NOTFOUND;
+   DBMS_OUTPUT.PUT_LINE(v_menu_item_name || ' costs ' || v_price ||' lei');
+  END LOOP;
+ CLOSE c_expensive;
+END;
+
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER TABLE PROJECT_ORDERS RENAME COLUMN ORDER_TYPE TO BILL';
+END;
+
+--Create a package that contains a  procedure and a function. 
+--The procedure returns the number of customers that made no orders and the function displays that number and returns YES or NO if a customer made orders or not.
+
+--Create a procedure that return the reservation date and name of a customer whose id is given
+
+CREATE OR REPLACE PROCEDURE pr_customer
+(p_cust_id IN NUMBER,
+p_name OUT project_customers.customer_name%TYPE,
+p_date OUT project_customers.reservation_date%TYPE)
+IS
+BEGIN 
+ SELECT customer_name,reservation_date into p_name, p_date FROM project_customers 
+ WHERE customer_id = p_cust_id;
+END;
+
+DECLARE
+ p_name project_customers.customer_name%TYPE;
+ p_date project_customers.reservation_date%TYPE;
+BEGIN
+ pr_customer(70999, p_name, p_date);
+ DBMS_OUTPUT.PUT_LINE('The employee '||p_name||' has a reservation on the date: '||p_date);
+END;
+
+
+--create a function that returns if a table has the capacity larger than 4
+
+CREATE OR REPLACE FUNCTION f_available
+(p_table_no IN project_tables.table_no%TYPE)
+  RETURN VARCHAR2
+  IS
+  v_cap project_tables.capacity%type;
+BEGIN
+  SELECT capacity into v_cap from project_tables where table_no = p_table_no;
+  DBMS_OUTPUT.PUT_LINE('The capacity is '||v_cap);
+  IF v_cap > 4 THEN
+   RETURN 'YES';
+  ELSE
+   return 'NO';
+  END IF;
+EXCEPTION 
+  WHEN no_data_found THEN
+  return 'NO';
+END;
+
+select f_available(7) from dual;
+
+--Create a function that return the value of the order placed by a customer using their id
+
+CREATE OR REPLACE FUNCTION GET_ORDERS_VALUE(P_CUSTOMER_ID NUMBER) RETURN NUMBER IS
+V_VAL NUMBER;
+BEGIN
+  SELECT SUM(ITEM_PRICE*ITEM_QUANTITY) INTO V_VAL FROM project_orders O JOIN project_menu_items mi ON O.item_id=mi.item_id
+     WHERE o.CUSTOMER_ID=P_CUSTOMER_ID;
+  IF SQL%NOTFOUND then
+  DBMS_OUTPUT.PUT_LINE('The customer does not exist');
+  END IF;
+
+  RETURN V_VAL;
+  EXCEPTION
+WHEN no_data_found THEN
+return NULL;
+END;
+
+select get_orders_value(70009) from dual;
+
+--Raise an exception when someone tries to acess the PL\SQL block outside work hours
+
+DECLARE
+e_hour EXCEPTION;
+
+BEGIN
+IF TO_NUMBER(TO_CHAR(SYSDATE, 'HH24'))<=11 OR TO_NUMBER(TO_CHAR(SYSDATE, 'HH24'))>=23 THEN
+RAISE e_hour;
+END IF;
+
+EXCEPTION
+WHEN e_hour THEN
+dbms_output.put_line('It is '||TO_CHAR(SYSDATE, 'HH24'));
+dbms_output.put_line('You cannot access the database at this hour.');
+END;
+
+
+--Create a trigger that prevents decreasing the salary of the chefs
+
+CREATE OR REPLACE TRIGGER restrict_chefs
+BEFORE UPDATE ON PROJECT_EMPLOYEES
+FOR EACH ROW
+BEGIN
+   DBMS_OUTPUT.PUT_LINE(:NEW.LAST_NAME||' HAS A JOB OF '||:NEW.JOB_NAME||' AN OLD SALARY OF '||:OLD.SALARY||
+   ' AND A NEW SALARY OF '||:NEW.SALARY);
+   IF :NEW.SALARY<:OLD.SALARY AND :NEW.JOB_NAME='Chef' THEN
+    RAISE_APPLICATION_ERROR(-20001,'We cannot decrease the salary of the chefs.');      
+   END IF;
+ END;
+
+
+SELECT * FROM PROJECT_EMPLOYEES WHERE EMPLOYEE_ID BETWEEN 70000 AND 100000;
+UPDATE project_EMPLOYEES SET SALARY=SALARY-10*SALARY/100 WHERE EMPLOYEE_ID BETWEEN 70000 AND 100000;
+  
+
+--Create a trigger that prevents tables from being deleted
+
+CREATE OR REPLACE TRIGGER t_delete
+BEFORE DELETE ON PROJECT_TABLES
+BEGIN 
+  RAISE_APPLICATION_ERROR(-20004, 'Deletions from TABLES table is forbidden.');
+END;
+
+DELETE FROM PROJECT_TABLES WHERE table_no = 3;
+
+--Create a trigger that is raised each time a the ingredients table is updated; 
+
+CREATE OR REPLACE TRIGGER t_ingredients_update
+BEFORE UPDATE ON PROJECT_INGREDIENTS
+  BEGIN dbms_output.put_line('An update was triggered at '||SYSDATE);
+END;
+
+BEGIN   
+  UPDATE PROJECT_INGREDIENTS
+  SET expiration_date = ADD_MONTHS(SYSDATE, 2) --we restock the expired ingredients today
+  WHERE expiration_date < SYSDATE;
+END;
+
+  
