@@ -1,3 +1,5 @@
+set serveroutput on;
+
 -- deleting the existing tables 
 
 BEGIN
