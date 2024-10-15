@@ -245,6 +245,27 @@ BEGIN
     EXECUTE IMMEDIATE 'INSERT INTO PROJECT_ORDERS (order_id, tips, waiter_id, customer_id, table_no, item_id, item_quantity) VALUES (207, 15, 13461, 70009, 5, 28, 2)';
 END;
 
+--select statements & in row and group functions 
 
+--1. Display the first and last name of the hosts that have worked for the restaurant for minimum 4 years
 
+DECLARE 
+  v_first_name EMPLOYEES.first_name%TYPE;
+  v_last_name EMPLOYEES.last_name%TYPE;
+BEGIN 
+  SELECT FIRST_NAME, LAST_NAME INTO v_first_name, v_last_name
+    FROM PROJECT_EMPLOYEES
+    WHERE EXTRACT(YEAR FROM SYSDATE) - EXTRACT(YEAR FROM HIRE_DATE) >= 4 
+      AND UPPER(job_name) = 'HOST';
+    DBMS_OUTPUT.PUT_LINE('The host with more than 4 years of experience in the establishment is: '||v_first_name || ' ' || v_last_name);
+END;
 
+--2. Display the number of chefs that have a smaller salary than the average one
+
+DECLARE 
+  v_count NUMBER;
+BEGIN 
+  SELECT COUNT(employee_id) INTO v_count FROM project_employees WHERE UPPER(job_name) = 'CHEF' 
+    AND salary < 50000;
+   DBMS_OUTPUT.PUT_LINE('The number of chefs that have a smaller salary than 50000 is ' || v_count);
+END;
